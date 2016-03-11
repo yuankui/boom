@@ -37,9 +37,11 @@ type result struct {
 	contentLength int64
 }
 
+type RequestProvider func() *http.Request
+
 type Boomer struct {
 	// Request is the request to be made.
-	Request *http.Request
+	RequestChan chan *http.Request
 
 	RequestBody string
 
@@ -182,7 +184,7 @@ func (b *Boomer) runWorkers() {
 		if b.Qps > 0 {
 			<-throttle
 		}
-		jobsch <- cloneRequest(b.Request, b.RequestBody)
+		jobsch <- cloneRequest(<-b.RequestChan, b.RequestBody)
 	}
 	close(jobsch)
 	wg.Wait()

@@ -35,9 +35,9 @@ func TestN(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", server.URL, nil)
 	boomer := &Boomer{
-		Request: req,
-		N:       20,
-		C:       2,
+		RequestChan: req,
+		N:           20,
+		C:           2,
 	}
 	boomer.Run()
 	if count != 20 {
@@ -56,10 +56,10 @@ func TestQps(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", server.URL, nil)
 	boomer := &Boomer{
-		Request: req,
-		N:       20,
-		C:       2,
-		Qps:     1,
+		RequestChan: req,
+		N:           20,
+		C:           2,
+		Qps:         1,
 	}
 	wg.Add(1)
 	time.AfterFunc(time.Second, func() {
@@ -91,9 +91,9 @@ func TestRequest(t *testing.T) {
 	req.Header = header
 	req.SetBasicAuth("username", "password")
 	boomer := &Boomer{
-		Request: req,
-		N:       1,
-		C:       1,
+		RequestChan: req,
+		N:           1,
+		C:           1,
 	}
 	boomer.Run()
 	if uri != "/" {
@@ -123,7 +123,7 @@ func TestBody(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", server.URL, bytes.NewBuffer([]byte("Body")))
 	boomer := &Boomer{
-		Request:     req,
+		RequestChan: req,
 		RequestBody: "Body",
 		N:           10,
 		C:           1,

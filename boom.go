@@ -15,16 +15,16 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"github.com/yuankui/boom/boomer"
 	"net/http"
 	gourl "net/url"
 	"os"
 	"regexp"
 	"runtime"
 	"strings"
-
-	"github.com/rakyll/boom/boomer"
 )
 
 const (
@@ -42,6 +42,7 @@ var (
 	readAll     = flag.Bool("readall", false, "")
 
 	output = flag.String("o", "", "")
+	file   = flag.String("f", "", "")
 
 	c    = flag.Int("c", 50, "")
 	n    = flag.Int("n", 200, "")
@@ -66,6 +67,7 @@ Options:
       "csv" is the only supported alternative. Dumps the response
       metrics in comma-seperated values format.
 
+  -f  Query Files to get From query from
   -m  HTTP method, one of GET, POST, PUT, DELETE, HEAD, OPTIONS.
   -h  Custom HTTP headers, name1:value1;name2:value2.
   -t  Timeout in ms.
@@ -154,17 +156,32 @@ func main() {
 		}
 	}
 
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		usageAndExit(err.Error())
-	}
-	req.Header = header
-	if username != "" || password != "" {
-		req.SetBasicAuth(username, password)
+	requestChan := make(chan *http.Request)
+
+	fmt.Println(*file)
+	if len(*file) == 0 {
+		go func() {
+			for {
+				requestChan <- buildRequest(method, url, header, username, password)
+			}
+		}()
+	} else {
+		urlChan, err := buildUrlChan(*file)
+
+		if err != nil {
+			usageAndExit(err.Error())
+		}
+		go func() {
+			for {
+				url := <-urlChan
+				req := buildRequest(method, url, header, username, password)
+				requestChan <- req
+			}
+		}()
 	}
 
 	(&boomer.Boomer{
-		Request:            req,
+		RequestChan:        requestChan,
 		RequestBody:        *body,
 		N:                  num,
 		C:                  conc,
@@ -177,6 +194,40 @@ func main() {
 		Output:             *output,
 		ReadAll:            *readAll,
 	}).Run()
+}
+
+func buildUrlChan(file string) (chan string, error) {
+	urlChan := make(chan string)
+
+	fd, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		for {
+			fd.Seek(0, 0)
+			scanner := bufio.NewScanner(fd)
+			for scanner.Scan() {
+				urlChan <- scanner.Text()
+			}
+		}
+		fd.Close()
+	}()
+
+	return urlChan, nil
+}
+
+func buildRequest(method, url string, header http.Header, username string, password string) *http.Request {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		usageAndExit(err.Error())
+	}
+	req.Header = header
+	if username != "" || password != "" {
+		req.SetBasicAuth(username, password)
+	}
+	return req
 }
 
 func usageAndExit(msg string) {
