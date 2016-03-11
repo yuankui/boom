@@ -19,7 +19,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/yuankui/boom/boomer"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	gourl "net/url"
 	"os"
 	"regexp"
@@ -49,6 +51,7 @@ var (
 	q    = flag.Int("q", 0, "")
 	t    = flag.Int("t", 0, "")
 	cpus = flag.Int("cpus", runtime.GOMAXPROCS(-1), "")
+	port = flag.Int64("p", 6060, "")
 
 	insecure           = flag.Bool("allow-insecure", false, "")
 	disableCompression = flag.Bool("disable-compression", false, "")
@@ -76,6 +79,7 @@ Options:
   -T  Content-type, defaults to "text/html".
   -a  Basic authentication, username:password.
   -x  HTTP Proxy address as host:port.
+  -p  Debug port for golang
 
   -readall              Consumes the entire request body.
   -allow-insecure       Allow bad/expired TLS/SSL certificates.
@@ -87,6 +91,11 @@ Options:
 `
 
 func main() {
+
+	go func() {
+		log.Println(http.ListenAndServe(fmt.Sprintf("localhost:%d", *port), nil))
+	}()
+
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, fmt.Sprintf(usage, runtime.NumCPU()))
 	}
@@ -156,7 +165,7 @@ func main() {
 		}
 	}
 
-	requestChan := make(chan *http.Request)
+	requestChan := make(chan *http.Request, 1000)
 
 	fmt.Println(*file)
 	if len(*file) == 0 {
@@ -197,7 +206,7 @@ func main() {
 }
 
 func buildUrlChan(file string) (chan string, error) {
-	urlChan := make(chan string)
+	urlChan := make(chan string, 1000)
 
 	fd, err := os.Open(file)
 	if err != nil {
