@@ -112,17 +112,19 @@ func (b *Boomer) incProgress() {
 // Run makes all the requests, prints the summary. It blocks until
 // all work is done.
 func (b *Boomer) Run() {
-	b.results = make(chan *result, int64(math.Min(float64(b.N), 2000)))
+	b.results = make(chan *result, int64(math.Min(float64(b.N), 20000)))
 	b.startProgress()
 
 	start := time.Now()
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
+	report := newReport(b.N, b.results, b.Output, start).run()
+
 	go func() {
 		<-c
 		// TODO(jbd): Progress bar should not be finalized.
-		newReport(b.N, b.results, b.Output, time.Now().Sub(start)).finalize()
+		report.finalize()
 		os.Exit(2)
 	}()
 
@@ -130,13 +132,13 @@ func (b *Boomer) Run() {
 
 	go func() {
 		<-timer.C
-		newReport(b.N, b.results, b.Output, time.Now().Sub(start)).finalize()
+		report.finalize()
 		os.Exit(0)
 	}()
 
 	b.runWorkers()
 	b.finalizeProgress()
-	newReport(b.N, b.results, b.Output, time.Now().Sub(start)).finalize()
+	report.finalize()
 	close(b.results)
 }
 
@@ -189,7 +191,7 @@ func (b *Boomer) runWorkers() {
 		throttle = time.Tick(time.Duration(1e6/(b.Qps)) * time.Microsecond)
 	}
 
-	jobsch := make(chan *http.Request, int64(math.Min(float64(b.N), 2000)))
+	jobsch := make(chan *http.Request, int64(math.Min(float64(b.N), 20000)))
 	for i := 0; i < b.C; i++ {
 		go b.runWorker(&wg, jobsch)
 	}

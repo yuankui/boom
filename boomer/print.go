@@ -32,8 +32,9 @@ type report struct {
 	average  float64
 	rps      float64
 
-	results chan *result
-	total   time.Duration
+	results   chan *result
+	startTime time.Time
+	total     time.Duration
 
 	errorDist      map[string]int
 	statusCodeDist map[int]int
@@ -41,39 +42,53 @@ type report struct {
 	sizeTotal      int64
 
 	output string
+
+	stop chan bool
+	done chan bool
 }
 
-func newReport(size int, results chan *result, output string, total time.Duration) *report {
+func newReport(size int, results chan *result, output string, startTime time.Time) *report {
 	return &report{
 		output:         output,
 		results:        results,
-		total:          total,
+		startTime:      startTime,
 		statusCodeDist: make(map[int]int),
 		errorDist:      make(map[string]int),
 	}
 }
 
-func (r *report) finalize() {
-	for {
-		select {
-		case res := <-r.results:
-			if res.err != nil {
-				r.errorDist[res.err.Error()]++
-			} else {
-				r.lats = append(r.lats, res.duration.Seconds())
-				r.avgTotal += res.duration.Seconds()
-				r.statusCodeDist[res.statusCode]++
-				if res.contentLength > 0 {
-					r.sizeTotal += res.contentLength
+func (r *report) run() *report {
+	r.stop = make(chan bool, 1)
+	r.done = make(chan bool, 1)
+	go func() {
+		for {
+			select {
+			case res := <-r.results:
+				if res.err != nil {
+					r.errorDist[res.err.Error()]++
+				} else {
+					r.lats = append(r.lats, res.duration.Seconds())
+					r.avgTotal += res.duration.Seconds()
+					r.statusCodeDist[res.statusCode]++
+					if res.contentLength > 0 {
+						r.sizeTotal += res.contentLength
+					}
 				}
+			case <-r.stop:
+				r.total = time.Now().Sub(r.startTime)
+				r.rps = float64(len(r.lats)) / r.total.Seconds()
+				r.average = r.avgTotal / float64(len(r.lats))
+				r.print()
+				r.done <- true
 			}
-		default:
-			r.rps = float64(len(r.lats)) / r.total.Seconds()
-			r.average = r.avgTotal / float64(len(r.lats))
-			r.print()
-			return
 		}
-	}
+	}()
+	return r
+}
+
+func (r *report) finalize() {
+	r.stop <- true
+	<-r.done
 }
 
 func (r *report) print() {
