@@ -165,6 +165,7 @@ func (b *Boomer) runWorker(wg *sync.WaitGroup, ch chan *http.Request) {
 			if b.ReadAll {
 				_, err = io.Copy(ioutil.Discard, resp.Body)
 			}
+			io.Copy(ioutil.Discard, resp.Body)
 			resp.Body.Close()
 		}
 
