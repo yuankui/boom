@@ -138,6 +138,8 @@ func main() {
 
 	// set content-type
 	header.Set("Content-Type", *contentType)
+	header.Set("Test-Flag", "true")
+	
 	// set any other additional headers
 	if *headers != "" {
 		headers := strings.Split(*headers, ";")
