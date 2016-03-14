@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/yuankui/boom/boomer"
 	"log"
+	"math"
 	"net/http"
 	_ "net/http/pprof"
 	gourl "net/url"
@@ -46,10 +47,11 @@ var (
 	output = flag.String("o", "", "")
 	file   = flag.String("f", "", "")
 
-	c    = flag.Int("c", 50, "")
+	c    = flag.Int("c", 4, "")
 	n    = flag.Int("n", 200, "")
-	q    = flag.Int("q", 0, "")
 	t    = flag.Int("t", 0, "")
+	q    = flag.Int("q", 0, "")
+	s    = flag.Int("s", 0, "")
 	cpus = flag.Int("cpus", runtime.GOMAXPROCS(-1), "")
 	port = flag.Int64("p", 6060, "")
 
@@ -62,9 +64,10 @@ var (
 var usage = `Usage: boom [options...] <url>
 
 Options:
-  -n  Number of requests to run.
-  -c  Number of requests to run concurrently. Total number of requests cannot
+  -n  Number of requests to run(default 200).
+  -c  Number of requests to run concurrently(default 4). Total number of requests cannot
       be smaller than the concurency level.
+  -t  timelimit for the benchmark in seconds
   -q  Rate limit, in seconds (QPS).
   -o  Output type. If none provided, a summary is printed.
       "csv" is the only supported alternative. Dumps the response
@@ -73,7 +76,7 @@ Options:
   -f  Query Files to get From query from
   -m  HTTP method, one of GET, POST, PUT, DELETE, HEAD, OPTIONS.
   -h  Custom HTTP headers, name1:value1;name2:value2.
-  -t  Timeout in ms.
+  -s  Timeout in ms.
   -A  HTTP Accept header.
   -d  HTTP request body.
   -T  Content-type, defaults to "text/html".
@@ -108,10 +111,18 @@ func main() {
 	runtime.GOMAXPROCS(*cpus)
 	num := *n
 	conc := *c
+	timelimit := *t
 	q := *q
 
-	if num <= 0 || conc <= 0 {
-		usageAndExit("n and c cannot be smaller than 1.")
+	// use timelimit if specified OR else use request number
+	if timelimit == 0 {
+		timelimit = math.MaxInt32
+	} else {
+		num = math.MaxInt32
+	}
+
+	if num <= 0 || conc <= 0 || timelimit < 0 {
+		usageAndExit("n, c and t cannot be smaller than 1.")
 	}
 
 	var (
@@ -167,7 +178,7 @@ func main() {
 
 	requestChan := make(chan *http.Request, 1000)
 
-	fmt.Println(*file)
+	// determine url from param or file
 	if len(*file) == 0 {
 		go func() {
 			for {
@@ -193,9 +204,10 @@ func main() {
 		RequestChan:        requestChan,
 		RequestBody:        *body,
 		N:                  num,
+		T:                  timelimit,
 		C:                  conc,
 		Qps:                q,
-		Timeout:            *t,
+		Timeout:            *s,
 		AllowInsecure:      *insecure,
 		DisableCompression: *disableCompression,
 		DisableKeepAlives:  *disableKeepAlives,

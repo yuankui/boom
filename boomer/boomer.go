@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/rakyll/pb"
+	"math"
 )
 
 type result struct {
@@ -47,6 +48,9 @@ type Boomer struct {
 
 	// N is the total number of requests to make.
 	N int
+
+	// T is the time limit(seconds) for the benchmarking
+	T int
 
 	// C is the concurrency level, the number of concurrent workers to run.
 	C int
@@ -108,7 +112,7 @@ func (b *Boomer) incProgress() {
 // Run makes all the requests, prints the summary. It blocks until
 // all work is done.
 func (b *Boomer) Run() {
-	b.results = make(chan *result, b.N)
+	b.results = make(chan *result, int64(math.Min(float64(b.N), 2000)))
 	b.startProgress()
 
 	start := time.Now()
@@ -120,6 +124,14 @@ func (b *Boomer) Run() {
 		// TODO(jbd): Progress bar should not be finalized.
 		newReport(b.N, b.results, b.Output, time.Now().Sub(start)).finalize()
 		os.Exit(2)
+	}()
+
+	timer := time.NewTimer(time.Second * time.Duration(b.T))
+
+	go func() {
+		<-timer.C
+		newReport(b.N, b.results, b.Output, time.Now().Sub(start)).finalize()
+		os.Exit(0)
 	}()
 
 	b.runWorkers()
@@ -176,7 +188,7 @@ func (b *Boomer) runWorkers() {
 		throttle = time.Tick(time.Duration(1e6/(b.Qps)) * time.Microsecond)
 	}
 
-	jobsch := make(chan *http.Request, b.N)
+	jobsch := make(chan *http.Request, int64(math.Min(float64(b.N), 2000)))
 	for i := 0; i < b.C; i++ {
 		go b.runWorker(&wg, jobsch)
 	}
