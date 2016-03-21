@@ -15,7 +15,9 @@
 package main
 
 import (
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestParseValidHeaderFlag(t *testing.T) {
@@ -56,5 +58,13 @@ func TestParseAuthMetaCharacters(t *testing.T) {
 	_, err := parseInputWithRegexp("plus+$*{:boom", authRegexp)
 	if err != nil {
 		t.Errorf("Could not parse an auth header with a plus sign in the user name")
+	}
+}
+
+func TestPerfFlag(t *testing.T) {
+	local, _ := time.LoadLocation("Local")
+	key := calcTestFlag("hello", time.Date(2016, 03, 21, 10, 0, 0, 0, local))
+	if key != "21fc6db97d069ec3e5ab153923b99cdd" {
+		t.Errorf(" test perf flag failed")
 	}
 }

@@ -16,6 +16,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/md5"
 	"flag"
 	"fmt"
 	"github.com/yuankui/boom/boomer"
@@ -28,6 +29,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -52,6 +54,7 @@ var (
 	t    = flag.Int("t", 0, "")
 	q    = flag.Int("q", 0, "")
 	s    = flag.Int("s", 0, "")
+	k    = flag.String("k", "", "")
 	cpus = flag.Int("cpus", runtime.GOMAXPROCS(-1), "")
 	port = flag.Int64("p", 6060, "")
 
@@ -77,6 +80,7 @@ Options:
   -m  HTTP method, one of GET, POST, PUT, DELETE, HEAD, OPTIONS.
   -h  Custom HTTP headers, name1:value1;name2:value2.
   -s  Timeout in ms.
+  -k  private key to generate 'X-Perf-Test' flag
   -A  HTTP Accept header.
   -d  HTTP request body.
   -T  Content-type, defaults to "text/html".
@@ -138,8 +142,11 @@ func main() {
 
 	// set content-type
 	header.Set("Content-Type", *contentType)
-	header.Set("Test-Flag", "true")
-	
+	if k != nil {
+		flag := calcTestFlag(*k, time.Now())
+		header.Set("X-Perf-Test", flag)
+	}
+
 	// set any other additional headers
 	if *headers != "" {
 		headers := strings.Split(*headers, ";")
@@ -184,6 +191,7 @@ func main() {
 	if len(*file) == 0 {
 		go func() {
 			for {
+
 				requestChan <- buildRequest(method, url, header, username, password)
 			}
 		}()
@@ -217,6 +225,15 @@ func main() {
 		Output:             *output,
 		ReadAll:            *readAll,
 	}).Run()
+}
+
+func calcTestFlag(key string, t time.Time) string {
+	hash := md5.New()
+	ts := t.Format("2006010215")
+	hash.Write([]byte(ts))
+	hash.Write([]byte(key))
+	ret := hash.Sum(nil)
+	return fmt.Sprintf("%x", ret)
 }
 
 func buildUrlChan(file string) (chan string, error) {
