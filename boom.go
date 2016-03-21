@@ -64,7 +64,7 @@ var (
 	proxyAddr          = flag.String("x", "", "")
 )
 
-var usage = `Usage: boom [options...] <url>
+var usage = `Usage: boom [options...] [url]
 
 Options:
   -n  Number of requests to run(default 200).
@@ -80,7 +80,7 @@ Options:
   -m  HTTP method, one of GET, POST, PUT, DELETE, HEAD, OPTIONS.
   -h  Custom HTTP headers, name1:value1;name2:value2.
   -s  Timeout in ms.
-  -k  private key to generate 'X-Perf-Test' flag
+  -k  private key to generate 'X-Perf-Test' flag, default('')
   -A  HTTP Accept header.
   -d  HTTP request body.
   -T  Content-type, defaults to "text/html".
@@ -108,8 +108,8 @@ func main() {
 	}
 
 	flag.Parse()
-	if flag.NArg() < 1 {
-		usageAndExit("")
+	if flag.NArg() < 1 && *file == "" {
+		usageAndExit("url or file must specified")
 	}
 
 	runtime.GOMAXPROCS(*cpus)
@@ -137,15 +137,18 @@ func main() {
 		header http.Header = make(http.Header)
 	)
 
-	url = flag.Args()[0]
+	if flag.NArg() < 1 {
+		url = ""
+	} else {
+		url = flag.Args()[0]
+	}
 	method = strings.ToUpper(*m)
 
 	// set content-type
 	header.Set("Content-Type", *contentType)
-	if k != nil {
-		flag := calcTestFlag(*k, time.Now())
-		header.Set("X-Perf-Test", flag)
-	}
+
+	flag := calcTestFlag(*k, time.Now())
+	header.Set("X-Perf-Test", flag)
 
 	// set any other additional headers
 	if *headers != "" {
