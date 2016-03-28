@@ -10,7 +10,7 @@ from elasticsearch.helpers import scan
 from optparse import OptionParser
 
 def get_index_name():
-    datetime.datetime.now().strftime("forseti-%Y%m%d")
+    return datetime.datetime.now().strftime("forseti-%Y%m%d")
 
 usage = "usage: %prog [options] <es_host>"
 parser = OptionParser(usage=usage)
@@ -22,7 +22,6 @@ parser.add_option("-i", "--index", help="index to query from, default(forseti-yy
 parser.add_option("", "--ignore", help="ignore the fields,seperated by comma(,)")
 
 options, args = parser.parse_args()
-
 
 def print_usage():
     parser.print_help(sys.stdout)
@@ -125,4 +124,3 @@ host = args[0]
 
 res = query(host, options)
 print_request_url(res, options)
-
